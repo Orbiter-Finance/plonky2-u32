@@ -25,7 +25,7 @@ use plonky2::plonk::vars::{
 
 /// A gate to perform a subtraction on 32-bit limbs: given `x`, `y`, and `borrow`, it returns
 /// the result `x - y - borrow` and, if this underflows, a new `borrow`. Inputs are not range-checked.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct U32SubtractionGate<F: RichField + Extendable<D>, const D: usize> {
     pub num_ops: usize,
     _phantom: PhantomData<F>,
@@ -273,8 +273,8 @@ impl<F: RichField + Extendable<D>, const D: usize> PackedEvaluableBase<F, D>
     }
 }
 
-#[derive(Clone, Debug)]
-struct U32SubtractionGenerator<F: RichField + Extendable<D>, const D: usize> {
+#[derive(Clone, Debug, Default)]
+pub struct U32SubtractionGenerator<F: RichField + Extendable<D>, const D: usize> {
     gate: U32SubtractionGate<F, D>,
     row: usize,
     i: usize,
