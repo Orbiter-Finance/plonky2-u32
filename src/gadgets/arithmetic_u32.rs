@@ -71,6 +71,12 @@ pub trait CircuitBuilderU32<F: RichField + Extendable<D>, const D: usize> {
 
     fn check_less_than_u32(&mut self, a: U32Target, b: U32Target,  num_bits: usize);
 
+    fn select_u32(&mut self, b: BoolTarget, x: U32Target, y: U32Target) -> U32Target;
+
+    fn check_less_than_safe_u32(&mut self, a: U32Target, b: u32);
+
+    fn copy_many_u32(&mut self, data: &[U32Target]) -> Vec<U32Target>;
+
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderU32<F, D>
@@ -159,6 +165,16 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderU32<F, D>
     fn add_u32(&mut self, a: U32Target, b: U32Target) -> (U32Target, U32Target) {
         let one = self.one_u32();
         self.mul_add_u32(a, one, b)
+    }
+
+    fn copy_many_u32(&mut self, data: &[U32Target]) -> Vec<U32Target> {
+        let mut result = Vec::new();
+        for x in data {
+            let copy = self.add_virtual_u32_target();
+            self.connect_u32(copy, *x);
+            result.push(copy);
+        }
+        result
     }
 
     fn add_many_u32(&mut self, to_add: &[U32Target]) -> (U32Target, U32Target) {
@@ -263,6 +279,13 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderU32<F, D>
         result
     }
 
+    fn check_less_than_safe_u32(&mut self, a: U32Target, b: u32) {
+        let b_target = self.constant_u32(b);
+        let num_bits = 32;
+        self.range_check(a.0, num_bits);
+        self.check_less_than_u32(a, b_target, num_bits)
+    }
+
     /// Constraints that `a` < `b`, same as is_less_than_u32 but asserts that !(b <= a)
     fn check_less_than_u32(&mut self, a: U32Target, b: U32Target,  num_bits: usize) {
 
@@ -282,6 +305,11 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilderU32<F, D>
         let b_le_a_result = Target::wire(b_le_a_row, b_le_a_gate.wire_result_bool());
 
        self.assert_zero(b_le_a_result)
+    }
+
+    fn select_u32(&mut self, b: BoolTarget, x: U32Target, y: U32Target) -> U32Target {
+        let result_target = self.select(b, x.0, y.0);
+        U32Target(result_target)
     }
 }
 
@@ -336,13 +364,14 @@ impl<F: RichField + Extendable<D>, const D: usize> SimpleGenerator<F, D>
 #[cfg(test)]
 mod tests {
 
+    use std::{dbg, println};
+
     use anyhow::{Ok, Result};
     use plonky2::iop::witness::PartialWitness;
     use plonky2::plonk::circuit_data::CircuitConfig;
     use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
     use rand::rngs::OsRng;
     use rand::Rng;
-
     use super::*;
 
     #[test]
